@@ -6,6 +6,7 @@ import sanitize from "mongo-sanitize";
 import { signupSchema } from "../validators/authValidators.js";
 import {sendMail} from "../config/sendMail.js"
 import bcrypt from 'bcrypt'
+import { generateTokens } from "../config/generateToken.js";
 export const signup=catchAsync(async(req,res,next)=>{
   const sanitizebod=sanitize(req.body)
   const validation=signupSchema.safeParse(sanitizebod)
@@ -92,9 +93,15 @@ export const verifyEmail=catchAsync(async (req,res,next)=>{
   user.isVerified=true;
   user.VerificationCode=undefined
   user.VerificationCodeExpires=undefined
-
+  const {accessToken,refreshToken}=generateTokens(user._id)
+  res.cookie('refreshToken',refreshToken,{
+    httpOnly:true,
+    secure:process.env.NODE_ENV='production',
+    sameSite:'Strict',
+    maxAge:7*24*60*60*1000
+  })  
   await user.save()
-
+  
   res.status(200).json({
     message:"Email verified successfully"
   })
