@@ -129,3 +129,7 @@ export const resentOtp=catchAsync(async (req,res,next)=>{
 
   res.status(200).json({message:"OTP sent"})
 })
+
+export const fuck=()=>{
+  return "fucked ho gya bhai"
+}
