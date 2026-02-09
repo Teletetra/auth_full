@@ -7,6 +7,10 @@ import { signupSchema } from "../validators/authValidators.js";
 import {sendMail} from "../config/sendMail.js"
 import bcrypt from 'bcrypt'
 import { generateTokens } from "../config/generateToken.js";
+import { jwt, success } from "zod";
+
+
+
 export const signup=catchAsync(async(req,res,next)=>{
   const sanitizebod=sanitize(req.body)
   const validation=signupSchema.safeParse(sanitizebod)
@@ -93,13 +97,7 @@ export const verifyEmail=catchAsync(async (req,res,next)=>{
   user.isVerified=true;
   user.VerificationCode=undefined
   user.VerificationCodeExpires=undefined
-  const {accessToken,refreshToken}=generateTokens(user._id)
-  res.cookie('refreshToken',refreshToken,{
-    httpOnly:true,
-    secure:process.env.NODE_ENV='production',
-    sameSite:'Strict',
-    maxAge:7*24*60*60*1000
-  })  
+
   await user.save()
   
   res.status(200).json({
@@ -133,3 +131,36 @@ export const resentOtp=catchAsync(async (req,res,next)=>{
 export const fuck=()=>{
   return "fucked ho gya bhai"
 }
+
+
+export const login=catchAsync(async(req,res,next)=>{
+    const {email,password}=req.body
+
+    if (!email || !password){
+      return res.status(400).json({message:"email or password is empty"})
+    }
+    const user=await User.findOne({email}).select("+password")
+
+    const isMatch=await bcrypt.compare(password,user.password)
+    if (!user || !isMatch){
+      return res.status(401).json({message:"Invalid password"})
+    }
+
+    if (!user.isVerified){
+      return res.status(401).json({message:"Please verify your account"})
+    }
+    const accessToken=jwt.sign({id:user._id},process.env.ACCESS_TOKEN_SECRET,{expiresIn:'15m'})
+
+    const refreshToken=jwt.sign({id:user._id},process.env.REFRESH_TOKEN_SECRET,{expiresIn:'7d'})
+
+    res.cookie('jwt',refreshToken,{
+      httpOnly:true,
+      secure:process.env_NODE_ENV=='production',
+      sameSite:'strict',
+      maxAge:7*24*60*60*1000
+    })
+
+    res.status(200).json({
+      success:true,accessToken,user:{id:user._id,name:user.name,email:user.email,role:user.role}
+    })
+})
